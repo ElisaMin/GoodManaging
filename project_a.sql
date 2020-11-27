@@ -32,7 +32,7 @@ CREATE TABLE products(
 drop table if exists commodities;
 create table commodities (
     id serial not null primary key ,
-    barcode int not null unique check ( length(barcode) > 9 and length(barcode) <17 ) ,
+    barcode int not null unique check ( length(barcode) in(7,15) ) ,
     product_id int references products(id),
     price money not null ,
     size text not null ,
@@ -47,30 +47,71 @@ create type device_type as ENUM (
     'desktop-client',
     'shit'
 );
-drop table if exists signed_users;
+
+
 create table signed_users(
     key text primary key not null ,
     device_id text unique not null ,
     device_type device_type not null default 'shit',
+    isWriteable boolean not null default false,
 --     isResigned bool default false not null ,
     signed_time timestamp default now() not null
 );
--- drop type if exists log_type;
--- create type log as ENUM ('insert','update','delete','login');
+-- 默认用户
+-- declare KEY_OF_DEFAULT
+insert into signed_users(key, device_id,isWriteable) values (md5(random()::text)::text,'None',true);
+-- 检查写入权限 --
+create or replace function isWriteable(kie text) returns Boolean as $$
+declare
+    writable boolean ;
+begin
+    select isWriteable into writable from signed_users where key==kie;
+    return  (found and writable) ;
+end;
+$$ language plpgsql;
+drop table if exists signed_users;
 
+-- log专场 --
+
+drop type if exists log_type;
+create type log_type as ENUM ('insert','update','delete','login','didnt_tell_yet');
 drop table if exists log;
 create table log(
     id serial primary key ,
-    log_time timestamp default  now() not null ,
+    user_key text references signed_users(key),
     target_name text not null ,
-    content jsonb not null ,
-    user_key text references signed_users(key)
+    content json not null ,
+    action log_type not null
+--         default 'didnt_tell_yet'
+                ,
+    log_time timestamp default now() not null
 );
+-- 日志生成
+create or replace procedure log(
+    in key text, in targetName text,in contents json,in actions log_type
+) as $$
+    begin
+        if isWriteable(key) then
+            insert into log(user_key, target_name, content,action)
+            values (key,targetName,contents,actions);
+        else
+            raise exception 'not allow to write %',key;
+        end if;
+    end
+$$ language plpgsql ;
+-- 记录INIT事件
+select
+
+
+
 
 -- TODO:view
+--触发器 记录插入SIGNED_USER
+-- create trigger AF_IN_SIGN after insert on signed_users for each row execute procedure ref()
+
 --触发器
 -- 在 父类型 插入前 执行
 --触发器 AF_IN__P_TYPE
 -- 在 父类型 插入后 执行
--- 逻辑大致: 获取statement的key,插入,提交
+-- 逻辑大致: 插入,提交
 --存储过程
