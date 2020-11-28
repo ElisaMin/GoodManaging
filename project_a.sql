@@ -39,7 +39,8 @@ create table commodities (
     product_id int references products(id),
     price money not null ,
     size text not null ,
-    other text not null ,
+    other text ,
+    image_path text ,
     insert_time timestamp default now()
 );
 -- 用户类型
@@ -154,8 +155,8 @@ exception
         return 400;
 return 500;end$$ language plpgsql;
 -- product insert function
-create or replace function insertProduct(keys text ,makerThis text,names text,types text,insertAll bool) returns smallint as
-$$declare
+create or replace function insertProduct(keys text ,makerThis text,names text,types text,insertAll bool) returns smallint as $$
+declare
     makerID int;
     typeID int;
 begin
@@ -186,7 +187,7 @@ begin
     end if;
     return 500;
 end$$ language plpgsql;
--- TODO : commodity insert function --复杂度攀升 下次再写 算了 就现在吧 下次一定
+
 -- type update function
 create or replace function updateType(key text ,updateParent bool,oldName text,newName text) returns int as $$
     begin
@@ -255,7 +256,6 @@ begin
 
     return 200;
 end $$ language plpgsql;
--- TODO : commodity update function
 -- type delete function
 create or replace function removeType(key text,parentType bool,typeName text) returns int language plpgsql as $$
     begin
@@ -272,7 +272,7 @@ create or replace function removeType(key text,parentType bool,typeName text) re
         return 200;
     end;
 $$;
--- TODO : product delete function
+-- product delete function
 create or replace function removeProductByName(key text,productName text) returns int language plpgsql as $$
 begin
     if not writeable(key) then return 401;end if;
@@ -281,5 +281,20 @@ begin
     delete from products where name = productName;
     return 200;
 end;$$;
-
+-- commodity insert function --复杂度攀升 下次再写 算了 就现在吧 下次一定 来了来了
+create or replace function insertCommodityByID(key text,barcodes int,productID int,price money,sizes text,ofer text) returns int as $$
+declare
+    tmpId int;
+begin
+    if not writeable(key) then return 401; end if;
+    if barcodes is null or productID is null or price is null or sizes is null then return 401; end if;
+    select id into tmpId from products where id = productID;
+    if not found then return 404; end if;
+    call log(key,'commodity', format('{"new":"%s"}',barcodes::text),'insert'::log_type);
+    insert into commodities(barcode,product_id,price,size,other) values (barcodes,productID,price,sizes,ofer);
+    return 200;
+end;
+$$ language plpgsql;
+-- TODO : commodity update function
 -- TODO : commodity delete function
+-- TODO : commodity image update function
