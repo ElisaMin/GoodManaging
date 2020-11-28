@@ -47,8 +47,7 @@ create type device_type as ENUM (
     'desktop-client',
     'shit'
 );
-
-
+drop table if exists signed_users;
 create table signed_users(
     key text primary key not null ,
     device_id text unique not null ,
@@ -58,8 +57,12 @@ create table signed_users(
     signed_time timestamp default now() not null
 );
 -- 默认用户
--- declare KEY_OF_DEFAULT
-insert into signed_users(key, device_id,isWriteable) values (md5(random()::text)::text,'None',true);
+create or replace function getDefaultUserKey() returns text as $$
+    begin
+        return query select key from signed_users where device_id == 'None_Master_';
+    end;
+    $$ language plpgsql;
+insert into signed_users(key, device_id,isWriteable) values (md5(random()::text)::text,'None_Master_',true);
 -- 检查写入权限 --
 create or replace function isWriteable(kie text) returns Boolean as $$
 declare
@@ -69,7 +72,7 @@ begin
     return  (found and writable) ;
 end;
 $$ language plpgsql;
-drop table if exists signed_users;
+
 
 -- log专场 --
 
@@ -87,6 +90,22 @@ create table log(
     log_time timestamp default now() not null
 );
 -- 日志生成
+
+create or replace procedure login(
+    in kie text ,in deviceID text , in deviceType device_type
+)  language plpgsql  as $$
+declare
+    writable bool;
+begin
+    insert into log(user_key, target_name, content,action)  values (getDefaultUserKey(),'users', concat('{"key":"',kie,'"}') ,'login');
+    select isWriteable into writable from signed_users where key == kie;
+    -- 如果不存在插入 存在时判断是否可写入 选择更新
+    if not found then
+        insert into signed_users(key, device_id,device_type,isWriteable) values(kie,deviceID,deviceType,true);
+    elseif not writable then
+        update signed_users set isWriteable = true where key == kie;
+    end if;
+end $$;
 create or replace procedure log(
     in key text, in targetName text,in contents json,in actions log_type
 ) as $$
@@ -95,12 +114,12 @@ create or replace procedure log(
             insert into log(user_key, target_name, content,action)
             values (key,targetName,contents,actions);
         else
-            raise exception 'not allow to write %',key;
+            raise exception '操作不允许!该用户未经授权!';
         end if;
     end
 $$ language plpgsql ;
 -- 记录INIT事件
-select
+call log(getDefaultUserKey(),'all', '{"m":"init"}','didnt_tell_yet'::log_type);
 
 
 
