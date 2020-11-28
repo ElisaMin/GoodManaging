@@ -290,15 +290,35 @@ begin
     if barcodes is null or productID is null or price is null or sizes is null then return 401; end if;
     select id into tmpId from products where id = productID;
     if not found then return 404; end if;
-    call log(key,'commodity', format('{"new":"%s"}',barcodes::text),'insert'::log_type);
+    call log(key,'commodities', format('{"new":"%s"}',barcodes::text),'insert'::log_type);
     insert into commodities(barcode,product_id,price,size,other) values (barcodes,productID,price,sizes,ofer);
     return 200;
 end;
 $$ language plpgsql;
--- TODO : commodity update function
-create or replace function updateCommodityByBarcode() returns int as $$
+-- commodity update function
+create or replace function updateCommodityByBarcode(key text,barcodes int,productID int,prices money,sized text) returns int as $$
+    declare
+        tmpM money;
+        tmpI int;
+        tmpT text ;
     begin
-
+        if not writeable(key) then return 401;end if;
+        if barcodes is null and productID is null and prices is null and sized is null then return 400 ;end if;
+        select price,product_id,size into tmpM,tmpI,tmpT from commodities where barcode = barcodes;
+        if not found then return 404;end if;
+        if productID is not null then
+            call log(key, 'commodities', format('{"old":"%s","new": "%s","target": "%s","col": "product_id"}',tmpI::text,productID::text,barcodes::text)::json,'update'::log_type);
+            update commodities set product_id = productID where barcode = barcodes;
+        end if;
+        if prices is not null then
+            call log(key,'commodities',format('{"old":"%s","new": "%s","target": "%s","col": "price"}',tmpM::text,prices::text,barcodes::text)::json,'update'::log_type);
+            update commodities set price = prices where barcode = barcodes;
+        end if;
+        if sized is not null then
+            call log(key,'commodities',format('{"old":"%s","new": "%s","target": "%s","col": "size"}',tmpT,sized,barcodes::text)::json,'update'::log_type);
+            update commodities set size = sized where barcode = barcodes;
+        end if;
+        return 200;
     end;
 $$ language plpgsql;
 -- TODO : commodity delete function
@@ -318,7 +338,7 @@ begin
     if not writeable(key) then return 401 ; end if;
     if barcodes is null or paths is null then return 400;end if;
     if barcodes not in(select barcode from commodities) then return 404 ;end if;
-    call log(key,'commodity', format('{"path":"%s"}',paths)::json,'update'::log_type);
+    call log(key,'commodities', format('{"path":"%s"}',paths)::json,'update'::log_type);
     update commodities set image_path = paths where barcode = barcodes;
     return 200;
 end;
