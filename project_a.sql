@@ -1,4 +1,5 @@
 -- 删除后创建
+drop view if exists commodities_info cascade ;
 drop table if exists log cascade ;
 drop type if exists log_type cascade ;
 drop table if exists signed_users cascade ;
@@ -43,6 +44,12 @@ create table commodities (
     image_path text ,
     insert_time timestamp default now()
 );
+-- view
+create view commodities_info(
+    barcode,price,maker,name,type,size,image_path,other
+) as select barcode,price::numeric,m.name,p.name,concat(b.name,';',s.name),size,image_path,other
+from commodities,makers as m,products as p,parent_types as b, sub_types as s
+where b.id =s.parent_id and s.id = p.type_id and p.id = product_id;
 -- 用户类型
 create type device_type as ENUM (
     'android','testing',
@@ -321,19 +328,30 @@ create or replace function updateCommodityByBarcode(key text,barcodes int,produc
         return 200;
     end;
 $$ language plpgsql;
--- TODO : commodity delete function
+--commodity delete function
 create or replace function removeCommodityByBarcode(key text,barcodes int) returns int language plpgsql as $$
-
+declare
+    bc int ;
+    pr money;
+    sz text;
+    pid int;
+    pth text;
+    oth text;
+    ist timestamp;
 begin
-    raise exception 'LogNotDoneYet';
+    -- format('{"old":"%s"}',barcodes)::json
     if not writeable(key) then return 401;end if;
-    if barcodes not in(select barcode from commodities) then return 404;end if;
-    call log(key,'product_types', format('{"old":"%s"}',barcodes)::json,'delete'::log_type);
+    select barcode,price,size,product_id,image_path,other,insert_time into bc,pr,sz,pid,pth,oth,ist from commodities where barcode=barcodes;
+    if not found then return 404;end if;
+    call log(key,'product_types',
+             format('{"old": {"barcode":%s,"price": %s,"size": "%s","productID": %s,"path": "%s","other": "%s","time": "%s"}}',
+                 bc::text,pr::numeric::text,sz,pid::text,pth,oth,ist::text)::json,'delete'::log_type
+    );
     delete from commodities where barcode = barcodes;
     return 200;
 end;$$;
 -- commodity image update function
-create or replace function updateCommodityImagePath(key text,barcodes int,paths text) as $$
+create or replace function updateCommodityImagePath(key text,barcodes int,paths text) returns int as $$
 begin
     if not writeable(key) then return 401 ; end if;
     if barcodes is null or paths is null then return 400;end if;
