@@ -36,7 +36,7 @@
 ```
 ## 数据库设计
 采用pgSql,插入接入API时全面使用function
-###　表 
+### 表 
 ~~引入用户系统~~ 暂无打算   
 #### 商品
 ![图解](docs_tmp/readme_database_entities_i.png)

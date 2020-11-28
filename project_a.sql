@@ -138,13 +138,13 @@ create or replace function insertType(key1 text ,parent1 text,sub text,insertAll
                 return 404;
             else
                 -- 插入log
-                call log(key1,'parent_type',concat('{"new":"',parent1,'"}')::json,'insert'::log_type);
+                call log(key1,'parent_types',concat('{"new":"',parent1,'"}')::json,'insert'::log_type);
                 -- 插入表并呼唤子类型插入
                 return insertType(key1,parent1,sub,false);
             end if;
         else
             -- 插入log
-            call log(key1,'sub_type',concat('{"new":"',sub,'"}')::json,'insert'::log_type);
+            call log(key1,'sub_types',concat('{"new":"',sub,'"}')::json,'insert'::log_type);
             -- 插入表
             insert into sub_types(name, parent_id) values (sub,parent_id);
             return 200;
@@ -153,7 +153,7 @@ exception
     when unique_violation then
         return 400;
 return 500;end$$ language plpgsql;
--- TODO : product insert function
+-- product insert function
 create or replace function insertProduct(keys text ,makerThis text,names text,types text,insertAll bool) returns smallint as
 $$declare
     makerID int;
@@ -186,10 +186,100 @@ begin
     end if;
     return 500;
 end$$ language plpgsql;
--- TODO : commodity insert function --复杂度攀升 下次再写
--- TODO : sub_type update function
--- TODO : product update function
+-- TODO : commodity insert function --复杂度攀升 下次再写 算了 就现在吧 下次一定
+-- type update function
+create or replace function updateType(key text ,updateParent bool,oldName text,newName text) returns int as $$
+    begin
+        -- null checking
+        if oldName is null or newName is null then return 400;end if;
+        -- writable
+        if not writeable(key) then return 401;end if;
+        if updateParent then
+            -- found checking
+            if oldName not in(select name from parent_types) then return 404;end if;
+            -- log
+            call log(key,'parent_types',format('{"old":"%s","new":"%s"}',oldName,newName)::json ,'update');
+            -- update
+            update parent_types set name=newName where name = oldName;
+            return 200;
+        else -- update sub type
+        -- found checking
+            if oldName not in(select name from sub_types) then return 404;end if;
+            -- log
+            call log(key,'sub_types',format('{"old":"%s","new":"%s"}',oldName,newName)::json ,'update');
+            -- update
+            update sub_types set name=newName where name = oldName;
+            return 200;
+        end if;
+        return 500;
+    end $$ language plpgsql;
+-- product update function
+create or replace function updateProductByName(key text ,productName text,makerName text,subTypeName text,newName text) returns int as $$
+declare
+    tmp text;
+    tmp_id int;
+begin
+    -- null checking
+    if newName is null and subTypeName is null and makerName is null and productName is null then return 400;end if;
+    -- item not in that than jump
+    if productName not in(select name from products) then return 404 ; end if;
+    -- writable
+    if not writeable(key) then return 401;end if;
+    -- update makerName
+    if makerName is not null then
+        -- found check
+        select name,id into tmp,tmp_id from makers where name = makerName;
+        if not FOUND then return 404 ;end if;
+        -- log
+        call log(key, 'products', format('{"old":"%s","new":"%s","col":"maker","target":"%s"}',tmp,makerName,productName)::json, 'update'::log_type);
+        -- update
+        update products set maker_id = tmp_id where name = productName;
+    end if;
+    -- update type
+    if subTypeName is not null then
+        -- found check
+        select name,id into tmp,tmp_id from sub_types where name = subTypeName;
+        if not FOUND then return 404 ;end if;
+        -- log
+        call log(key, 'products', format('{"old":"%s","new":"%s","col":"type","target":"%s"}',tmp,subTypeName,productName)::json, 'update'::log_type);
+        -- update
+        update products set type_id = tmp_id where name = productName;
+    end if;
+    -- update productName
+    if subTypeName is not null then
+        -- log
+        call log(key, 'products', format('{"old":"%s","new":"%s","col":"name"}',productName,newName)::json, 'update'::log_type);
+        -- update
+        update products set name = newName where name = productName;
+    end if;
+
+    return 200;
+end $$ language plpgsql;
 -- TODO : commodity update function
--- TODO : sub_type delete function
+-- type delete function
+create or replace function removeType(key text,parentType bool,typeName text) returns int language plpgsql as $$
+    begin
+        if not writeable(key) then return 401;end if;
+        if not parentType then
+            if typeName not in(select name from sub_types) then return 404;end if;
+            call log(key,'sub_types', format('{"old":"%s"}',typeName)::json,'delete'::log_type);
+            delete from sub_types where name = typeName;
+        else
+            if typeName not in(select name from parent_types) then return 404;end if;
+            call log(key,'parent_types', format('{"old":"%s"}',typeName)::json,'delete'::log_type);
+            delete from parent_types where name = typeName;
+        end if;
+        return 200;
+    end;
+$$;
 -- TODO : product delete function
+create or replace function removeProductByName(key text,productName text) returns int language plpgsql as $$
+begin
+    if not writeable(key) then return 401;end if;
+    if productName not in(select name from products) then return 404;end if;
+    call log(key,'product_types', format('{"old":"%s"}',productName)::json,'delete'::log_type);
+    delete from products where name = productName;
+    return 200;
+end;$$;
+
 -- TODO : commodity delete function
