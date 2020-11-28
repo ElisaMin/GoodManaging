@@ -12,15 +12,13 @@ CREATE TABLE sub_types (
     name  TEXT NOT NULL UNIQUE,
     parent_id SMALLINT NOT NULL REFERENCES parent_types (id)
 );
--- 删除后创建
+-- 厂家
 DROP TABLE IF EXISTS makers;
 CREATE TABLE makers (
     id   SERIAL NOT NULL PRIMARY KEY,
     name TEXT   NOT NULL UNIQUE
 );
-
--- 删除后创建
---写你妈大小写 爬
+-- 产品 写你妈大小写 爬
 DROP TABLE IF EXISTS products;
 CREATE TABLE products(
     id serial primary key not null ,
@@ -28,7 +26,7 @@ CREATE TABLE products(
     name text not null ,
     type_id smallint references sub_types(id)
 );
-
+-- 商品
 drop table if exists commodities;
 create table commodities (
     id serial not null primary key ,
@@ -39,7 +37,7 @@ create table commodities (
     other text not null ,
     insert_time timestamp default now()
 );
-
+-- 用户表
 drop type if exists device_type;
 create type device_type as ENUM (
     'android','testing',
@@ -64,7 +62,7 @@ create or replace function getDefaultUserKey() returns text as $$
     $$ language plpgsql;
 insert into signed_users(key, device_id,isWriteable) values (md5(random()::text)::text,'None_Master_',true);
 -- 检查写入权限 --
-create or replace function isWriteable(kie text) returns Boolean as $$
+create or replace function writeable(kie text) returns Boolean as $$
 declare
     writable boolean ;
 begin
@@ -72,10 +70,7 @@ begin
     return  (found and writable) ;
 end;
 $$ language plpgsql;
-
-
 -- log专场 --
-
 drop type if exists log_type;
 create type log_type as ENUM ('insert','update','delete','login','didnt_tell_yet');
 drop table if exists log;
@@ -110,7 +105,7 @@ create or replace procedure log(
     in key text, in targetName text,in contents json,in actions log_type
 ) as $$
     begin
-        if isWriteable(key) then
+        if writeable(key) then
             insert into log(user_key, target_name, content,action)
             values (key,targetName,contents,actions);
         else
@@ -120,17 +115,21 @@ create or replace procedure log(
 $$ language plpgsql ;
 -- 记录INIT事件
 call log(getDefaultUserKey(),'all', '{"m":"init"}','didnt_tell_yet'::log_type);
+-- TODO : view
+-- TODO : sub_type insert function
+create or replace function insertType(key1 text ,parent1 text,sub text) returns table(isSuccess bool,message text) as
+    $$declare
+        parent2 text;
+    begin
+        select name into parent2 from parent_types where name == parent1 ;
+        if not FOUND then
+            return query select false,'找不到数据';
+        elseif not writeable(key1) then
+            return query select false,'用户未通过验证';
+        end if;
 
+    end$$;
+-- TODO : product insert function
+-- TODO : sub_type update function
+-- TODO : product update function
 
-
-
--- TODO:view
---触发器 记录插入SIGNED_USER
--- create trigger AF_IN_SIGN after insert on signed_users for each row execute procedure ref()
-
---触发器
--- 在 父类型 插入前 执行
---触发器 AF_IN__P_TYPE
--- 在 父类型 插入后 执行
--- 逻辑大致: 插入,提交
---存储过程
