@@ -296,5 +296,30 @@ begin
 end;
 $$ language plpgsql;
 -- TODO : commodity update function
+create or replace function updateCommodityByBarcode() returns int as $$
+    begin
+
+    end;
+$$ language plpgsql;
 -- TODO : commodity delete function
--- TODO : commodity image update function
+create or replace function removeCommodityByBarcode(key text,barcodes int) returns int language plpgsql as $$
+
+begin
+    raise exception 'LogNotDoneYet';
+    if not writeable(key) then return 401;end if;
+    if barcodes not in(select barcode from commodities) then return 404;end if;
+    call log(key,'product_types', format('{"old":"%s"}',barcodes)::json,'delete'::log_type);
+    delete from commodities where barcode = barcodes;
+    return 200;
+end;$$;
+-- commodity image update function
+create or replace function updateCommodityImagePath(key text,barcodes int,paths text) as $$
+begin
+    if not writeable(key) then return 401 ; end if;
+    if barcodes is null or paths is null then return 400;end if;
+    if barcodes not in(select barcode from commodities) then return 404 ;end if;
+    call log(key,'commodity', format('{"path":"%s"}',paths)::json,'update'::log_type);
+    update commodities set image_path = paths where barcode = barcodes;
+    return 200;
+end;
+$$ language plpgsql;
