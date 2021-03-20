@@ -6,6 +6,9 @@
 * 后端架构的选择
 ```
 写完SQL到下一步就是后端了,我会去了解一下目前比较流行且有前瞻的后端框架(好吃饭的
+目标为把json返回出去
+--剩下SprintBoot和Ktor
+我选择ktor因为更简单点看起来哈哈哈
 ```
 * 更新时的function设计
 ```
@@ -108,109 +111,12 @@
 ### TODOS
 凌晨三点准时锁定用户写入权限
 ## Api设计
-通过HTTP协议达到增加删除更新效果 以``/``作为域名根目录 如:  
-```url
-https://mygoods.fuwushang.top/get?id=111111111111
-```
-则简写成
-```url
-/get?id=111111111111
-```  
-返回类型往常为json
-```json5
-{
-  key: 'value'
-}
-```
-### 搜索场景
-method get,返回值引用下方的[商品信息]
-```json5 
-[
-    {商品信息},
-    ........
-    {商品信息}
-]
-```
-#### 主页需要的固定值
-> /t/a  
-#### 分页需要的下一页 上一页
-> /t/a?page=${page}
-#### 按照条形码查询商品信息
-type = barcode ; key = 690321562179
-> /s?t=b&k=${id}
-#### 按照厂家名称查询商品信息
-type = maker ; key = 散装
-> /s?t=m&k=${producer}
-#### 按照类型查询商品信息
-type=type;key=洗发水
-> /s?t=t&k=${type}
-#### ~~模糊查询 不会做~~
-> /s?t=m&k=${keyword}&k=${keyword}&k=${keyword}
-#### 查询所有厂家
-> /t/m
-#### 查询所有类型
-> /t/t
-#### 查询所有产品
-> /t/p
-### 可增加/更新场景有:
-此操作为危险操作,需要key进行验证用户. method部分post
-#### 添加/更新类型
-get
-> /u?t=t&k=${name}
-> /u?t=t&k=${origin}&v=${changed}
-#### 添加/更新图片
-post
-> /u?t=p&k=${barcode}
-> body 为图片本身
-#### 添加/更新厂家信息
-get 
-> /u?t=m&k=${origin}&v=${changed}
-#### 添加/更新商品信息
-post:type=info;if(update)key=target
-> /u?t=i
-```json5
-{商品信息: "完整"}
-```
-> /u?t=i&k=${barcode}
-```json5
-{商品信息: "碎片化"}
-```
-#### 批量上传
-## 返回规范
-错误时会有相应的状态码,并把错误原因放在response body内,response type为文本。正确时响应json
-### 状态码
-* 参数有误 400
-* 更新时不允许该用户 401
-* 找不到项 404
-* 响应正确 200
-### 响应信息
-* 子类型
-```json5
-['parent;type','parent;type','parent;type']
-```
-* 产品
-```json5
-[
-  {
-    id:-1,name:'name',maker:'producer',type:'parent;type'
-  },{
-    id:-2,name:'name',maker:'producer',type:'parent;type'
-  }
-]
-```
-* 商品信息
-```json5
-[{
-  barcode:6901234123456,
-  maker:'散装',name:'牛奶',
-  price:'￥6.0',size:'斤',
-  pic:'sh4g6sf2rg45f42h52jf3k45.jpg',
-  type:'parent;type',other:',thins'
-}]
-```
+GraphQL
 ## 效果
 ## 后端设计
+使用SpringBoot
 ## 前端设计
+JetpackCompose
 
 
 
